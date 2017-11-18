@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 
 
 def hook(bindAddr, hookPath, secret, callback):
@@ -52,8 +52,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Another webhook for GitHub')
     parser.add_argument("-p", "--port", type=int, default=8000, help='Port to bind')
     parser.add_argument("-b", "--bind", default="", help='Address to bind')
+    parser.add_argument("-a", "--path", default="/webhook", help='Path to bind')
     parser.add_argument("-s", "--sig", default="", help='X-Hub-Signature')
     parser.add_argument("program", help='Program to execute, json passes as stdin')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    hook((args.bind, args.port), '/webhook', None, lambda data: subprocess.run(args.program, input=data.encode('UTF-8'), stdout=subprocess.PIPE).stdout)
+    hook((args.bind, args.port), args.path, args.sig, lambda data: subprocess.run(args.program.split(), input=data.encode('UTF-8'), stdout=subprocess.PIPE).stdout)
