@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 import logging
 
 
 def hook(bindAddr, hookPath, secret, callback):
     _str = lambda obj: "" if obj is None else str(obj)
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import urlencode, urlparse, parse_qs
     from http.server import BaseHTTPRequestHandler, HTTPServer
     import hmac, hashlib
 
@@ -17,7 +18,7 @@ def hook(bindAddr, hookPath, secret, callback):
             cLength = int(self.headers['Content-Length'])
             if cLength > 0:
                 if _str(self.headers['content-type']) == 'application/x-www-form-urlencoded':
-                    self.process(session.path, parse_qs('&'.join([session.query, self.rfile.read(cLength).decode('utf-8')])), None)
+                    self.process(session.path, parse_qs('&'.join([session.query, self.rfile.read(cLength).decode()])), None)
                 else:
                     self.process(session.path, parse_qs(session.query), self.rfile.read(cLength))
             else:
@@ -26,11 +27,11 @@ def hook(bindAddr, hookPath, secret, callback):
         def process(http, path, query, data):
             if path == hookPath:
                 logging.info('EventID:' + " ".join([_str(http.headers['X-GitHub-Delivery']), _str(http.headers['X-GitHub-Event'])]))
-                payload = _str(query['payload'][0]) if data is None else data.decode('UTF-8')
+                payload = _str(query['payload'][0]) if data is None else data.decode()
+                localSig = 'sha1=' + hmac.new(_str(secret).encode(), (urlencode({'payload': payload}) if data is None else payload).encode(), hashlib.sha1).hexdigest()
                 remoteSig = _str(http.headers['X-Hub-Signature'])
-                localSig = 'sha1=' + hmac.new(_str(secret).encode('UTF-8'), payload.encode('UTF-8'), hashlib.sha1).hexdigest()
-                logging.info('X-Hub-Signature:' + remoteSig)
                 logging.info('Local-Signature:' + localSig)
+                logging.info('X-Hub-Signature:' + remoteSig)
                 if (_str(secret) == '' and remoteSig == '') or (remoteSig == localSig):
                     http.send_response(200)
                     http.send_header('Content-type', 'text/plain')
@@ -57,4 +58,4 @@ if __name__ == '__main__':
     parser.add_argument("program", help='Program to execute, json passes as stdin')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    hook((args.bind, args.port), args.path, args.sig, lambda data: subprocess.run(args.program.split(), input=data.encode('UTF-8'), stdout=subprocess.PIPE).stdout)
+    hook((args.bind, args.port), args.path, args.sig, lambda data: subprocess.run(args.program.split(), input=data.encode(), stdout=subprocess.PIPE).stdout)
